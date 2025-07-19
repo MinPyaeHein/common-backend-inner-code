@@ -2,13 +2,21 @@ package com.inner_code.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.inner_code.dto.HealingRequest;
+import com.inner_code.dto.LoginRequest;
+import com.inner_code.dto.LoginResponse;
 import com.inner_code.dto.PersonalOverViewDto;
 import com.inner_code.model.User;
+import com.inner_code.security.JwtUtil;
+import com.inner_code.service.CustomUserDetailsService;
 import com.inner_code.service.HealingService;
 import com.inner_code.service.UserService;
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,19 +26,41 @@ import java.util.List;
 @CrossOrigin
 @AllArgsConstructor
 public class UserController {
-    @Autowired
-    private final UserService userService;
 
+    private final UserService userService;
     private final HealingService healingService;
+    private final AuthenticationManager authManager;
+    private final JwtUtil jwtUtil;
+    private final CustomUserDetailsService userDetailsService;
+
+    @PostMapping("/login")
+    public LoginResponse login(@RequestBody LoginRequest request) {
+        authManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+        );
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
+        String token = jwtUtil.generateToken(userDetails.getUsername());
+        return new LoginResponse(token);
+    }
     @GetMapping("/search")
     public User getUsers() {
         return null;
     }
 
     @PostMapping("/register")
-    public String registerUser(@RequestBody User user) {
-        return userService.registerUser(user);
+    public ResponseEntity<?> register(@RequestBody User user) {
+        if (userService.emailExists(user.getEmail())) {
+            return ResponseEntity.badRequest().body("Email already exists");
+        }
+        User savedUser = userService.registerUser(user);
+        return ResponseEntity.ok(savedUser);
     }
+
+//    @PostMapping("/login")
+//    public ResponseEntity<?> login(@RequestBody LoginRequest LoginRequest) {
+//        return ResponseEntity.ok(LoginRequest);
+//    }
 
     @GetMapping
     public List<User> getAllUsers() {
